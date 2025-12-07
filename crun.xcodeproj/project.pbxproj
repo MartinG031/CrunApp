@@ -6,13 +6,31 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		010F658F2EE4778000C2DA6F /* CrunIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 010F658E2EE4778000C2DA6F /* CrunIcon.icon */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
-		010F65622EE2C57B00C2DA6F /* crun.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = crun.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		010F65622EE2C57B00C2DA6F /* crun.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = crun.app; path = "/Users/martinjay/Documents/XCODE/crun/build/Debug-iphoneos/crun.app"; sourceTree = "<absolute>"; };
+		010F658E2EE4778000C2DA6F /* CrunIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = CrunIcon.icon; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		010F65812EE3E0A600C2DA6F /* Exceptions for "crun" folder in "crun" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 010F65612EE2C57B00C2DA6F /* crun */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		010F65642EE2C57B00C2DA6F /* crun */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				010F65812EE3E0A600C2DA6F /* Exceptions for "crun" folder in "crun" target */,
+			);
 			path = crun;
 			sourceTree = "<group>";
 		};
@@ -33,16 +51,8 @@
 			isa = PBXGroup;
 			children = (
 				010F65642EE2C57B00C2DA6F /* crun */,
-				010F65632EE2C57B00C2DA6F /* Products */,
+				010F658E2EE4778000C2DA6F /* CrunIcon.icon */,
 			);
-			sourceTree = "<group>";
-		};
-		010F65632EE2C57B00C2DA6F /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				010F65622EE2C57B00C2DA6F /* crun.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -95,7 +105,7 @@
 			mainGroup = 010F65592EE2C57B00C2DA6F;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = 010F65632EE2C57B00C2DA6F /* Products */;
+			productRefGroup = 010F65592EE2C57B00C2DA6F;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -109,6 +119,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				010F658F2EE4778000C2DA6F /* CrunIcon.icon in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -249,13 +260,16 @@
 		010F656E2EE2C57C00C2DA6F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = CrunIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=iphoneos*]" = CrunIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FFFUXMJG83;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = crun/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -281,13 +295,15 @@
 		010F656F2EE2C57C00C2DA6F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = CrunIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = FFFUXMJG83;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = crun/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
