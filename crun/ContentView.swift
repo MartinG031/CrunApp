@@ -47,12 +47,10 @@ struct HistoryStore {
         }
     }
 
+    /// 在线程安全的前提下读取历史数据，通过 MainActor.run 确保对 UserDefaults 的访问发生在主线程上。
     static func loadAsync() async -> [AnalysisRecord] {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let result = load()
-                continuation.resume(returning: result)
-            }
+        await MainActor.run {
+            load()
         }
     }
 
