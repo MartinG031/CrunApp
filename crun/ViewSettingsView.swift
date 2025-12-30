@@ -200,6 +200,8 @@ struct ViewSettingsView: View {
 
     // MARK: - 模型服务（自定义 Base URL + API Key）
     @AppStorage("provider_base_url") private var providerBaseURL: String = "https://dashscope.aliyuncs.com/compatible-mode"
+    @AppStorage("provider_text_model") private var providerTextModel: String = "qwen-plus"
+    @AppStorage("provider_vision_model") private var providerVisionModel: String = "qwen3-vl-plus"
 
     // MARK: - 其他设置（沿用你项目中已被使用的 key）
 
@@ -239,6 +241,16 @@ struct ViewSettingsView: View {
                     .autocorrectionDisabled(true)
                     .keyboardType(.URL)
 
+                TextField("Text Model（对话）", text: $providerTextModel)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .keyboardType(.asciiCapable)
+
+                TextField("Vision Model（截图分析）", text: $providerVisionModel)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .keyboardType(.asciiCapable)
+
                 SecureField("API Key", text: $apiKeyInput)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled(true)
@@ -267,8 +279,10 @@ struct ViewSettingsView: View {
 
                     Button(role: .destructive) {
                         do {
-                            // 恢复默认设置：重置 Base URL，并清除钥匙串中的 API Key
+                            // 恢复默认设置：重置 Base URL 和模型ID，并清除钥匙串中的 API Key
                             providerBaseURL = "https://dashscope.aliyuncs.com/compatible-mode"
+                            providerTextModel = "qwen-plus"
+                            providerVisionModel = "qwen3-vl-plus"
                             try KeychainStore.deleteAPIKey()
                             apiKeyInput = ""
 
@@ -283,7 +297,12 @@ struct ViewSettingsView: View {
                     } label: {
                         Text("恢复默认设置")
                     }
-                    .disabled(providerBaseURL == "https://dashscope.aliyuncs.com/compatible-mode" && !isAPIKeyConfigured)
+                    .disabled(
+                        providerBaseURL == "https://dashscope.aliyuncs.com/compatible-mode"
+                        && providerTextModel == "qwen-plus"
+                        && providerVisionModel == "qwen3-vl-plus"
+                        && !isAPIKeyConfigured
+                    )
                 }
             } header: {
                 Text("自定义模型服务")
