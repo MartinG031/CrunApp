@@ -257,53 +257,49 @@ struct ViewSettingsView: View {
                     .keyboardType(.asciiCapable)
                     .privacySensitive()
 
-                HStack {
-                    Button {
-                        do {
-                            try KeychainStore.upsertAPIKey(apiKeyInput)
-                            apiKeyInput = ""
-                            alertTitle = "已保存"
-                            alertMessage = "API Key 已保存到钥匙串。"
-                            showAlert = true
-                        } catch {
-                            alertTitle = "保存失败"
-                            alertMessage = error.localizedDescription
-                            showAlert = true
-                        }
-                    } label: {
-                        Text("保存")
+                Button {
+                    do {
+                        try KeychainStore.upsertAPIKey(apiKeyInput)
+                        apiKeyInput = ""
+                        alertTitle = "已保存"
+                        alertMessage = "API Key 已保存到钥匙串。"
+                        showAlert = true
+                    } catch {
+                        alertTitle = "保存失败"
+                        alertMessage = error.localizedDescription
+                        showAlert = true
                     }
-                    .disabled(apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                    Spacer()
-
-                    Button(role: .destructive) {
-                        do {
-                            // 恢复默认设置：重置 Base URL 和模型ID，并清除钥匙串中的 API Key
-                            providerBaseURL = "https://dashscope.aliyuncs.com/compatible-mode"
-                            providerTextModel = "qwen-plus"
-                            providerVisionModel = "qwen3-vl-plus"
-                            try KeychainStore.deleteAPIKey()
-                            apiKeyInput = ""
-
-                            alertTitle = "已恢复默认设置"
-                            alertMessage = "已重置 Base URL，并从钥匙串移除 API Key。"
-                            showAlert = true
-                        } catch {
-                            alertTitle = "恢复失败"
-                            alertMessage = error.localizedDescription
-                            showAlert = true
-                        }
-                    } label: {
-                        Text("恢复默认设置")
-                    }
-                    .disabled(
-                        providerBaseURL == "https://dashscope.aliyuncs.com/compatible-mode"
-                        && providerTextModel == "qwen-plus"
-                        && providerVisionModel == "qwen3-vl-plus"
-                        && !isAPIKeyConfigured
-                    )
+                } label: {
+                    Text("保存")
                 }
+                .disabled(apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                Button(role: .destructive) {
+                    do {
+                        // 恢复默认设置：重置 Base URL 和模型ID，并清除钥匙串中的 API Key
+                        providerBaseURL = "https://dashscope.aliyuncs.com/compatible-mode"
+                        providerTextModel = "qwen-plus"
+                        providerVisionModel = "qwen3-vl-plus"
+                        try KeychainStore.deleteAPIKey()
+                        apiKeyInput = ""
+
+                        alertTitle = "已恢复默认设置"
+                        alertMessage = "已重置 Base URL，并从钥匙串移除 API Key。"
+                        showAlert = true
+                    } catch {
+                        alertTitle = "恢复失败"
+                        alertMessage = error.localizedDescription
+                        showAlert = true
+                    }
+                } label: {
+                    Text("恢复默认设置")
+                }
+                .disabled(
+                    providerBaseURL == "https://dashscope.aliyuncs.com/compatible-mode"
+                    && providerTextModel == "qwen-plus"
+                    && providerVisionModel == "qwen3-vl-plus"
+                    && !isAPIKeyConfigured
+                )
             } header: {
                 Text("自定义模型服务")
             } footer: {
