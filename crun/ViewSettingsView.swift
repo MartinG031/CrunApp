@@ -267,20 +267,23 @@ struct ViewSettingsView: View {
 
                     Button(role: .destructive) {
                         do {
+                            // 恢复默认设置：重置 Base URL，并清除钥匙串中的 API Key
+                            providerBaseURL = "https://dashscope.aliyuncs.com/compatible-mode"
                             try KeychainStore.deleteAPIKey()
                             apiKeyInput = ""
-                            alertTitle = "已清除"
-                            alertMessage = "已从钥匙串移除 API Key。"
+
+                            alertTitle = "已恢复默认设置"
+                            alertMessage = "已重置 Base URL，并从钥匙串移除 API Key。"
                             showAlert = true
                         } catch {
-                            alertTitle = "清除失败"
+                            alertTitle = "恢复失败"
                             alertMessage = error.localizedDescription
                             showAlert = true
                         }
                     } label: {
-                        Text("清除")
+                        Text("恢复默认设置")
                     }
-                    .disabled(!isAPIKeyConfigured)
+                    .disabled(providerBaseURL == "https://dashscope.aliyuncs.com/compatible-mode" && !isAPIKeyConfigured)
                 }
             } header: {
                 Text("自定义模型服务")
