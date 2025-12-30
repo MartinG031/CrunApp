@@ -10,73 +10,96 @@ protocol QwenServicing {
 final class QwenClient: QwenServicing {
     static let shared = QwenClient()
 
-    // MARK: - Config (DashScope OpenAI Compatible Mode)
-    private let baseURL: URL = URL(string: "https://dashscope.aliyuncs.com/compatible-mode")!
+    private let session: URLSession = {
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.timeoutIntervalForRequest = 30
+        cfg.timeoutIntervalForResource = 60
+        return URLSession(configuration: cfg)
+    }()
 
-    /// /v1/chat/completions
-    private lazy var chatCompletionsURL: URL = baseURL.appendingPathComponent("v1/chat/completions")
+    private static let jsonEncoder: JSONEncoder = {
+        JSONEncoder()
+    }()
 
-    /// /v1/models (用于 warmUp，可选)
-    private lazy var modelsURL: URL = baseURL.appendingPathComponent("v1/models")
+    private static let jsonDecoder: JSONDecoder = {
+        JSONDecoder()
+    }()
 
-    /// 与 Xcode Intelligence Provider 截图一致：Authorization
+    // MARK: - Provider Config (只保留 URL + API)
+
+    private struct ProviderConfig {
+        let baseURL: URL
+        let authorization: String
+
+        var chatCompletionsURL: URL { baseURL.appendingPathComponent("v1/chat/completions") }
+        var modelsURL: URL { baseURL.appendingPathComponent("v1/models") }
+    }
+
+    // 默认使用 Qwen（不在设置中暴露模型选择）
+    private let defaultChatModel = "qwen-plus"
+    private let defaultVisionModel = "qwen-vl-plus"
+
     private let apiKeyHeaderField = "Authorization"
 
-    /// 建议在 Info.plist 配置：ALIYUNCS_API_KEY（或沿用你原来的 DASHSCOPE_API_KEY）
-    /// - 如果你在 Xcode Intelligence 里 API Key 字段填的是“裸 key”，这里会自动补上 "Bearer "
-    /// - 如果你填的是“Bearer xxxxxx”，这里不会重复添加
-    private func authorizationValue() throws -> String {
-        let key = try apiKeyOrThrow().trimmingCharacters(in: .whitespacesAndNewlines)
-        if key.lowercased().hasPrefix("bearer ") { return key }
-        return "Bearer \(key)"
+    private func providerConfig() throws -> ProviderConfig {
+        let rawBase = UserDefaults.standard.string(forKey: "provider_base_url")
+        let normalizedBase = normalizeBaseURL(rawBase) ?? "https://dashscope.aliyuncs.com/compatible-mode"
+        let baseURL = URL(string: normalizedBase) ?? URL(string: "https://dashscope.aliyuncs.com/compatible-mode")!
+
+        let apiKey = try apiKeyOrThrow().trimmingCharacters(in: .whitespacesAndNewlines)
+        let authorization = apiKey.lowercased().hasPrefix("bearer ") ? apiKey : "Bearer \(apiKey)"
+
+        return ProviderConfig(baseURL: baseURL, authorization: authorization)
     }
 
     private func apiKeyOrThrow() throws -> String {
-        // 你可以只留一个；我这里做了兼容：ALIYUNCS_API_KEY 优先，其次 DASHSCOPE_API_KEY
-        if let v = Bundle.main.object(forInfoDictionaryKey: "ALIYUNCS_API_KEY") as? String, !v.isEmpty {
+        // 1) Keychain（设置页保存的）
+        if let v = KeychainStore.readAPIKey(),
+           !v.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return v
         }
-        if let v = Bundle.main.object(forInfoDictionaryKey: "DASHSCOPE_API_KEY") as? String, !v.isEmpty {
+
+        // 2) 可选：Info.plist（仅建议本机调试；不要提交真实 key）
+        if let v = Bundle.main.object(forInfoDictionaryKey: "DASHSCOPE_API_KEY") as? String,
+           !v.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return v
         }
 
         throw NSError(
             domain: "QwenClient",
             code: -1000,
-            userInfo: [NSLocalizedDescriptionKey: "API Key 未配置：请在 Info.plist 配置 ALIYUNCS_API_KEY（或 DASHSCOPE_API_KEY）"]
+            userInfo: [NSLocalizedDescriptionKey: "API Key 未配置：请在设置中填写 API Key"]
         )
     }
 
-    /// 让 model 名称与你 Xcode Intelligence Provider 的 Models.Identifier 对齐（例如：codeqwen1.5-7b-chat）
-    /// - 你可以在 Info.plist 配置：ALIYUNCS_VISION_MODEL / ALIYUNCS_CHAT_MODEL
-    private var visionModel: String {
-        (Bundle.main.object(forInfoDictionaryKey: "ALIYUNCS_VISION_MODEL") as? String).nonEmpty
-        ?? "qwen-vl-plus"
-    }
-
-    private var chatModel: String {
-        (Bundle.main.object(forInfoDictionaryKey: "ALIYUNCS_CHAT_MODEL") as? String).nonEmpty
-        ?? "codeqwen1.5-7b-chat"
+    private func normalizeBaseURL(_ raw: String?) -> String? {
+        guard var s = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
+        // 用户误填 /v1 或 /v1/ 时自动剥离
+        if s.hasSuffix("/v1") { s.removeLast(3) }
+        else if s.hasSuffix("/v1/") { s.removeLast(4) }
+        // 去掉末尾多余斜杠
+        while s.hasSuffix("/") { s.removeLast() }
+        return s
     }
 
     // MARK: - Public
 
     func warmUp() async {
-        // 目的：提前触发 TLS / DNS / 网络栈 warm，失败也不影响主流程
-        var req = URLRequest(url: modelsURL)
-        req.httpMethod = "GET"
-        req.setValue("application/json", forHTTPHeaderField: "Accept")
-
+        // warmUp 失败不影响主流程
         do {
-            req.setValue(try authorizationValue(), forHTTPHeaderField: apiKeyHeaderField)
-            _ = try await URLSession.shared.data(for: req)
-        } catch {
-            // 忽略 warmUp 失败
-        }
+            let cfg = try providerConfig()
+            var req = URLRequest(url: cfg.modelsURL)
+            req.httpMethod = "GET"
+            req.setValue("application/json", forHTTPHeaderField: "Accept")
+            req.setValue(cfg.authorization, forHTTPHeaderField: apiKeyHeaderField)
+            _ = try await session.data(for: req)
+        } catch { }
     }
 
     func analyzeScreen(screenshot: UIImage?, instruction: String) async throws -> String {
-        let imageURL = try screenshot.flatMap { try Self.toDataURL($0) } // OpenAI compatible: image_url 支持 data URL
+        let cfg = try providerConfig()
+        let imageURL = try screenshot.flatMap { try Self.toDataURL($0) }
+
         let systemPrompt =
         """
         你是一个iOS助手。请根据用户给定的指令，结合截图内容进行识别与总结。要求：结构化输出，先给摘要，再给要点。
@@ -96,7 +119,7 @@ final class QwenClient: QwenServicing {
         }()
 
         let payload = ChatCompletionRequest(
-            model: visionModel,
+            model: (screenshot == nil ? defaultChatModel : defaultVisionModel),
             messages: [
                 .init(role: "system", content: [.init(type: "text", text: systemPrompt, image_url: nil)]),
                 .init(role: "user", content: userContent)
@@ -104,11 +127,12 @@ final class QwenClient: QwenServicing {
             temperature: 0.2
         )
 
-        return try await sendChatCompletion(payload: payload)
+        return try await sendChatCompletion(payload: payload, cfg: cfg)
     }
 
     func followUp(initialSummary: String, history: [ChatMessage]) async throws -> String {
-        // 将你的 ChatMessage 映射为 OpenAI compatible messages
+        let cfg = try providerConfig()
+
         let systemPrompt =
         """
         你是一个对话助手。用户在基于“initialSummary”继续追问。你需要结合 initialSummary 与历史对话，给出简洁、直接、可执行的回答。
@@ -127,33 +151,45 @@ final class QwenClient: QwenServicing {
         })
 
         let payload = ChatCompletionRequest(
-            model: chatModel,
+            model: defaultChatModel,
             messages: messages,
             temperature: 0.4
         )
 
-        return try await sendChatCompletion(payload: payload)
+        return try await sendChatCompletion(payload: payload, cfg: cfg)
     }
 
     // MARK: - Networking
 
-    private func sendChatCompletion(payload: ChatCompletionRequest) async throws -> String {
-        var req = URLRequest(url: chatCompletionsURL)
+    private func sendChatCompletion(payload: ChatCompletionRequest, cfg: ProviderConfig) async throws -> String {
+        var req = URLRequest(url: cfg.chatCompletionsURL)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue(try authorizationValue(), forHTTPHeaderField: apiKeyHeaderField)
+        req.setValue(cfg.authorization, forHTTPHeaderField: apiKeyHeaderField)
 
-        let body = try JSONEncoder().encode(payload)
+        let body = try Self.jsonEncoder.encode(payload)
         req.httpBody = body
 
-        let (data, resp) = try await URLSession.shared.data(for: req)
+        let (data, resp) = try await session.data(for: req)
 
         guard let http = resp as? HTTPURLResponse else {
             throw NSError(domain: "QwenClient", code: -1, userInfo: [NSLocalizedDescriptionKey: "无效响应"])
         }
+
         guard (200...299).contains(http.statusCode) else {
             let serverText = String(data: data, encoding: .utf8) ?? ""
+
+            if let apiError = try? Self.jsonDecoder.decode(APIErrorResponse.self, from: data),
+               let message = apiError.error.message?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !message.isEmpty {
+                throw NSError(
+                    domain: "QwenClient",
+                    code: http.statusCode,
+                    userInfo: [NSLocalizedDescriptionKey: "服务端错误(\(http.statusCode))：\(message)"]
+                )
+            }
+
             throw NSError(
                 domain: "QwenClient",
                 code: http.statusCode,
@@ -161,9 +197,8 @@ final class QwenClient: QwenServicing {
             )
         }
 
-        let decoded = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
-        let text = decoded.choices.first?.message.content?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return text
+        let decoded = try Self.jsonDecoder.decode(ChatCompletionResponse.self, from: data)
+        return decoded.choices.first?.message.content?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     // MARK: - Models (OpenAI Compatible)
@@ -197,28 +232,23 @@ final class QwenClient: QwenServicing {
         let choices: [Choice]
     }
 
-    // MARK: - Helpers
+    private struct APIErrorResponse: Decodable {
+        struct APIError: Decodable {
+            let message: String?
+        }
+        let error: APIError
+    }
 
     private static func toDataURL(_ image: UIImage) throws -> String {
         guard let data = image.jpegData(compressionQuality: 0.85) else {
             throw NSError(domain: "QwenClient", code: -2, userInfo: [NSLocalizedDescriptionKey: "截图编码失败"])
         }
-        let b64 = data.base64EncodedString()
-        return "data:image/jpeg;base64,\(b64)"
+        return "data:image/jpeg;base64,\(data.base64EncodedString())"
     }
 }
 
-// MARK: - Convenience Extensions
-
-private extension Optional where Wrapped == String {
-    var nonEmpty: String? {
-        guard let s = self?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
-        return s
-    }
-}
-
-// 你项目里 ChatMessage 的 role 可能是 enum（例如 .user / .assistant / .system）
-// 这里给一个最常见的映射：若你的命名不同，改这一个扩展即可。
+// 仅用于把你项目里的 ChatMessage.Role 映射到 OpenAI 兼容 role 字符串。
+// 若你的 enum case 名不同，只改这里即可。
 private extension ChatMessage.Role {
     var openAIRoleString: String {
         switch self {

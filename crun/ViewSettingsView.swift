@@ -1,108 +1,8 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
-
-    @AppStorage("enableHistory") private var enableHistory: Bool = true
-    @AppStorage("maxHistoryCount") private var maxHistoryCount: Int = 20
-    @AppStorage("showTimestampInHistory") private var showTimestampInHistory: Bool = true
-    @AppStorage("showInstructionInHistory") private var showInstructionInHistory: Bool = true
-    @AppStorage("enableHaptics") private var enableHaptics: Bool = true
-
-    private var appVersionString: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
-        return "\(version) (\(build))"
-    }
-
     var body: some View {
-        Form {
-            Section(header: Text("应用偏好")) {
-                Toggle("触觉反馈", isOn: $enableHaptics)
-            }
-
-            Section(header: Text("历史记录")) {
-                Toggle("保存历史记录", isOn: $enableHistory)
-
-                Picker("最多保留条数", selection: $maxHistoryCount) {
-                    Text("5 条").tag(5)
-                    Text("10 条").tag(10)
-                    Text("20 条").tag(20)
-                    Text("50 条").tag(50)
-                    Text("100 条").tag(100)
-                    Text("200 条").tag(200)
-                    Text("500 条").tag(500)
-                }
-                .pickerStyle(.menu)
-                .disabled(!enableHistory)
-
-                Text("超过上限时会自动删除最早的记录，仅保留最近的几条。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(header: Text("列表显示")) {
-                Toggle("显示时间", isOn: $showTimestampInHistory)
-                Toggle("显示指令内容", isOn: $showInstructionInHistory)
-
-                Text("可以根据个人习惯，控制历史列表的信息密度。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(header: Text("快捷指令")) {
-                Button {
-                    if let url = URL(string: "https://www.icloud.com/shortcuts/11019da16f4f44919524aa83fcc2b8b8") {
-                        openURL(url)
-                    }
-                } label: {
-                    HStack {
-                        Text("添加或管理 Crun 快捷指令")
-                        Spacer()
-                        Image(systemName: "arrow.up.right.square")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text("将共享链接添加到“快捷指令”App 后，可以在设置 ▸ 动作按钮中选择「Crun」一键分析当前屏幕。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(header: Text("关于")) {
-                HStack {
-                    Text("版本")
-                    Spacer()
-                    Text(appVersionString)
-                        .foregroundStyle(.secondary)
-                }
-
-                Button {
-                    if let url = URL(string: "mailto:martinjay200031@gmail.com?subject=Crun 反馈") {
-                        openURL(url)
-                    }
-                } label: {
-                    HStack {
-                        Text("发送反馈")
-                        Spacer()
-                        Image(systemName: "envelope")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-        }
-        .navigationTitle("设置")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                }
-            }
-        }
+        ViewSettingsView()
     }
 }
 
@@ -291,6 +191,226 @@ struct OnboardingView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct ViewSettingsView: View {
+    @Environment(\.openURL) private var openURL
+
+    // MARK: - 模型服务（自定义 Base URL + API Key）
+    @AppStorage("provider_base_url") private var providerBaseURL: String = "https://dashscope.aliyuncs.com/compatible-mode"
+
+    // MARK: - 其他设置（沿用你项目中已被使用的 key）
+
+    @AppStorage("enableHistory") private var enableHistory: Bool = true
+    @AppStorage("maxHistoryCount") private var maxHistoryCount: Int = 20
+    @AppStorage("showTimestampInHistory") private var showTimestampInHistory: Bool = true
+    @AppStorage("showInstructionInHistory") private var showInstructionInHistory: Bool = true
+    @AppStorage("enableHaptics") private var enableHaptics: Bool = true
+
+    @State private var historyCount: Int = 0
+    @State private var showClearHistoryConfirm = false
+
+    @State private var apiKeyInput: String = ""
+    @State private var showAlert = false
+    @State private var alertTitle = ""
+    @State private var alertMessage = ""
+
+    private var isAPIKeyConfigured: Bool {
+        (KeychainStore.readAPIKey()?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+    }
+
+
+    private var appVersionString: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        if version.isEmpty { return build }
+        if build.isEmpty { return version }
+        return "\(version) (\(build))"
+    }
+
+    var body: some View {
+        Form {
+            // MARK: - 模型服务
+            Section {
+                TextField("Base URL", text: $providerBaseURL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .keyboardType(.URL)
+
+                SecureField("API Key", text: $apiKeyInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .keyboardType(.asciiCapable)
+                    .privacySensitive()
+
+                HStack {
+                    Button {
+                        do {
+                            try KeychainStore.upsertAPIKey(apiKeyInput)
+                            apiKeyInput = ""
+                            alertTitle = "已保存"
+                            alertMessage = "API Key 已保存到钥匙串。"
+                            showAlert = true
+                        } catch {
+                            alertTitle = "保存失败"
+                            alertMessage = error.localizedDescription
+                            showAlert = true
+                        }
+                    } label: {
+                        Text("保存")
+                    }
+                    .disabled(apiKeyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Spacer()
+
+                    Button(role: .destructive) {
+                        do {
+                            try KeychainStore.deleteAPIKey()
+                            apiKeyInput = ""
+                            alertTitle = "已清除"
+                            alertMessage = "已从钥匙串移除 API Key。"
+                            showAlert = true
+                        } catch {
+                            alertTitle = "清除失败"
+                            alertMessage = error.localizedDescription
+                            showAlert = true
+                        }
+                    } label: {
+                        Text("清除")
+                    }
+                    .disabled(!isAPIKeyConfigured)
+                }
+            } header: {
+                Text("自定义模型服务")
+            } footer: {
+                Text("Base URL 用于切换模型服务地址；API Key 将安全存储在系统钥匙串中（保存后自动清除内容）。")
+            }
+
+
+            // MARK: - 历史记录
+            Section {
+                Toggle("保存历史记录", isOn: $enableHistory)
+
+                Picker("最多保留条数", selection: $maxHistoryCount) {
+                    Text("5 条").tag(5)
+                    Text("10 条").tag(10)
+                    Text("20 条").tag(20)
+                    Text("50 条").tag(50)
+                    Text("100 条").tag(100)
+                    Text("200 条").tag(200)
+                    Text("500 条").tag(500)
+                }
+                .pickerStyle(.menu)
+                .disabled(!enableHistory)
+
+                Toggle("显示时间", isOn: $showTimestampInHistory)
+                    .disabled(!enableHistory)
+
+                Toggle("显示指令内容", isOn: $showInstructionInHistory)
+                    .disabled(!enableHistory)
+
+                HStack {
+                    Text("当前条目数")
+                    Spacer()
+                    Text("\(historyCount)")
+                        .foregroundStyle(.secondary)
+                }
+
+                Button(role: .destructive) {
+                    showClearHistoryConfirm = true
+                } label: {
+                    Text("清空历史记录")
+                }
+                .disabled(!enableHistory || historyCount == 0)
+            } header: {
+                Text("历史记录")
+            } footer: {
+                Text("关闭后将不再保存新的历史记录。超过上限时会自动删除最早的记录，仅保留最近的几条。")
+            }
+
+            // MARK: - 触觉反馈
+            Section {
+                Toggle("触觉反馈", isOn: $enableHaptics)
+            } header: {
+                Text("触觉反馈")
+            }
+
+            // MARK: - 快捷指令
+            Section {
+                Button {
+                    if let url = URL(string: "https://www.icloud.com/shortcuts/11019da16f4f44919524aa83fcc2b8b8") {
+                        openURL(url)
+                    }
+                } label: {
+                    HStack {
+                        Text("添加或管理 Crun 快捷指令")
+                        Spacer()
+                        Image(systemName: "arrow.up.right.square")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text("将共享链接添加到“快捷指令”App 后，可以在设置 ▸ 动作按钮中选择「Crun」一键分析当前屏幕。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("快捷指令")
+            }
+
+            // MARK: - 关于
+            Section {
+                HStack {
+                    Text("版本")
+                    Spacer()
+                    Text(appVersionString)
+                        .foregroundStyle(.secondary)
+                }
+
+                Button {
+                    if let url = URL(string: "mailto:martinjay200031@gmail.com?subject=Crun 反馈") {
+                        openURL(url)
+                    }
+                } label: {
+                    HStack {
+                        Text("发送反馈")
+                        Spacer()
+                        Image(systemName: "envelope")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("关于")
+            }
+        }
+        .navigationTitle("设置")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            let items = await HistoryStore.loadAsync()
+            historyCount = items.count
+        }
+        .onChange(of: enableHistory) { _, _ in
+            Task {
+                let items = await HistoryStore.loadAsync()
+                historyCount = items.count
+            }
+        }
+        .alert(isPresented: $showClearHistoryConfirm) {
+            Alert(
+                title: Text("确定要清空历史记录？"),
+                message: Text("此操作不可撤销。"),
+                primaryButton: .destructive(Text("清空")) {
+                    let cleared = HistoryStore.clear()
+                    historyCount = cleared.count
+                },
+                secondaryButton: .cancel(Text("取消"))
+            )
+        }
+        .alert(alertTitle, isPresented: $showAlert) {
+            Button("好", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
         }
     }
 }
